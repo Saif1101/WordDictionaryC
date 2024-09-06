@@ -1,24 +1,45 @@
 model:
   name: patchcore
-  backbone: resnet18  # Backbone model for feature extraction
-  layers: [layer2, layer3]  # Layers from which features will be extracted
+  backbone: resnet50  # Use ResNet50 for capturing detailed features of the PDF pages
+  layers: [layer2, layer3]  # Focus on mid-level features for detailed anomaly detection
+  input_size: 640  # Resize images to 640x640 for high resolution
 
 dataset:
   name: folder
   format: folder
-  path: ./dataset  # Path to the dataset folder
-  normal_dir: normal  # Subfolder for normal images
-  abnormal_dir: anomalous  # Subfolder for anomalous images (for testing)
-  image_size: 640  # Image size for resizing input images
+  path: ./dataset  # Path to your dataset folder
+  normal_dir: normal  # Subfolder containing normal PDF images (including tick marks)
+  abnormal_dir: anomalous  # Subfolder containing anomalous images (handwritten notes, etc.)
+  image_size: 640  # Ensure all images are resized to 640x640
 
 trainer:
-  accelerator: gpu  # Set to 'gpu' if you have one, otherwise 'cpu'
-  gpus: 1
-  max_epochs: 100  # Number of training epochs
-
-logging:
-  log_images: True  # Set to True if you want to log images during training
+  accelerator: gpu  # Use GPU for faster training; use 'cpu' if no GPU available
+  gpus: 1  # Use one GPU (can be adjusted based on available hardware)
+  max_epochs: 150  # Train for 150 epochs for better convergence
+  precision: 16  # Use mixed precision training to speed up training and reduce memory usage
 
 optim:
-  lr: 0.001  # Learning rate
-  weight_decay: 1e-5  # Weight decay for the optimizer
+  lr: 0.001  # Learning rate for training
+  weight_decay: 1e-5  # Weight decay to prevent overfitting
+
+callbacks:
+  - model_checkpoint:
+      monitor: val_loss  # Save the model with the lowest validation loss
+      save_top_k: 3  # Save the top 3 models
+  - early_stopping:
+      monitor: val_loss  # Stop training early if validation loss doesn't improve
+      patience: 10  # Wait for 10 epochs before stopping
+
+logging:
+  log_images: True  # Log images of the anomaly map during training
+  logger: tensorboard  # Use TensorBoard to log metrics and images
+
+patchcore:
+  patch_size: 32  # Patch size small enough to detect fine-grained anomalies
+  stride: 16  # Ensure overlap between patches to catch small anomalies
+  num_neighbors: 9  # Number of nearest neighbors to compare patches
+  memory_bank_size: 0.50  # Use 50% of patches for memory bank (to capture more normal variations)
+
+post_processing:
+  threshold: 0.7  # Set the anomaly threshold to classify regions as anomalous (lower if necessary)
+  smoothing: True  # Apply smoothing to the anomaly map for cleaner detection
