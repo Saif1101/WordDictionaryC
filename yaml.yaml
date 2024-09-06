@@ -1,0 +1,24 @@
+model:
+  name: patchcore
+  backbone: resnet18  # Backbone model for feature extraction
+  layers: [layer2, layer3]  # Layers from which features will be extracted
+
+dataset:
+  name: folder
+  format: folder
+  path: ./dataset  # Path to the dataset folder
+  normal_dir: normal  # Subfolder for normal images
+  abnormal_dir: anomalous  # Subfolder for anomalous images (for testing)
+  image_size: 640  # Image size for resizing input images
+
+trainer:
+  accelerator: gpu  # Set to 'gpu' if you have one, otherwise 'cpu'
+  gpus: 1
+  max_epochs: 100  # Number of training epochs
+
+logging:
+  log_images: True  # Set to True if you want to log images during training
+
+optim:
+  lr: 0.001  # Learning rate
+  weight_decay: 1e-5  # Weight decay for the optimizer
