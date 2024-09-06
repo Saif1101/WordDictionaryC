@@ -33,11 +33,34 @@ class CustomFolderDataset(Dataset):
     def __getitem__(self, idx):
         image_path = self.image_paths[idx]
         label = self.labels[idx]
-        image = Image.open(image_path).convert("RGB")
-        image = np.array(image)
+        
+        try:
+            # Open the image
+            image = Image.open(image_path).convert("RGB")
+            image = np.array(image)
+        except Exception as e:
+            print(f"Error loading image at {image_path}: {e}")
+            return None, None
+        
+        # Apply transformations (if any)
         if self.transform:
-            image = self.transform(image=image)["image"]
+            try:
+                image = self.transform(image=image)["image"]
+            except Exception as e:
+                print(f"Error applying transformations to image at {image_path}: {e}")
+                return None, None
+        
         return image, label
+
+# Custom collate function to handle empty batches
+def custom_collate_fn(batch):
+    # Remove any samples that have None as image or label
+    batch = [item for item in batch if item[0] is not None]
+    
+    if len(batch) == 0:
+        raise RuntimeError("Empty batch encountered")
+    
+    return torch.utils.data.dataloader.default_collate(batch)
 
 # Preprocessing and augmentation transformations
 def get_preprocessing(image_size=640):
@@ -75,18 +98,23 @@ def objective(trial):
         transform=get_preprocessing(image_size=640)
     )
 
+    print(f"Number of training samples: {len(train_dataset)}")
+    print(f"Number of test samples: {len(test_dataset)}")
+
     train_loader = DataLoader(
         dataset=train_dataset,
         batch_size=32,
         shuffle=True,
-        num_workers=4
+        num_workers=4,
+        collate_fn=custom_collate_fn
     )
 
     test_loader = DataLoader(
         dataset=test_dataset,
         batch_size=32,
         shuffle=False,
-        num_workers=4
+        num_workers=4,
+        collate_fn=custom_collate_fn
     )
 
     model = Patchcore(
