@@ -101,4 +101,31 @@ def objective(trial):
 
     checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",
-        dir
+        dirpath="checkpoints/",
+        save_top_k=1,
+        mode="min"
+    )
+
+    lr_monitor = LearningRateMonitor(logging_interval="epoch")
+
+    trainer = Trainer(
+        max_epochs=100,
+        accelerator="gpu",
+        gpus=1,
+        precision=16,
+        callbacks=[checkpoint_callback, lr_monitor]
+    )
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+
+    trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=test_loader)
+    result = trainer.test(model, test_dataloaders=test_loader)
+
+    val_loss = result[0]['val_loss']
+    return val_loss
+
+# Optuna study
+study = optuna.create_study(direction="minimize")
+study.optimize(objective, n_trials=20)
+
+print("Best hyperparameters: ", study.best_params)
