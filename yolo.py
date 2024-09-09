@@ -31,41 +31,24 @@ class YOLOv8:
         return img
 
     def postprocess(self, output, img, orig_img):
-        if isinstance(output, (list, tuple)):
-            output = output[0]  # select first element if output is a list/tuple
-        
-        if isinstance(output, torch.Tensor):
-            output = output.cpu().numpy()
-        
-        if output.ndim == 3:
-            output = output[0]  # select first element if output has an extra dimension
+        print(f"Output type: {type(output)}")
+        if isinstance(output, tuple):
+            print(f"Output tuple length: {len(output)}")
+            for i, item in enumerate(output):
+                print(f"Item {i} type: {type(item)}, shape: {item.shape if hasattr(item, 'shape') else 'N/A'}")
+            
+            # Assume the first element of the tuple contains the detections
+            pred = output[0]
+        else:
+            pred = output
 
-        # Filter out low confidence predictions
-        valid = output[:, 4] > self.conf_thres
-        output = output[valid]
-
-        if len(output) == 0:
-            return []
-
-        # Perform NMS
-        boxes = xywh2xyxy(output[:, :4])
-        scores = output[:, 4]
-        class_ids = output[:, 5].astype(int)
-
-        indices = torchvision.ops.nms(
-            torch.tensor(boxes),
-            torch.tensor(scores),
-            self.iou_thres
-        )
-
+        pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, max_det=self.max_det)
         results = []
-        for i in indices:
-            box = boxes[i]
-            score = scores[i]
-            class_id = class_ids[i]
-            box_scaled = scale_coords(img.shape[2:], box, orig_img.shape)
-            results.append((box_scaled, score, class_id))
-
+        for i, det in enumerate(pred):
+            if len(det):
+                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], orig_img.shape).round()
+                for *xyxy, conf, cls in reversed(det):
+                    results.append((xyxy, conf, cls))
         return results
 
     def predict(self, img_path):
@@ -79,13 +62,13 @@ class YOLOv8:
         
         return [
             {
-                'bbox': [int(x) for x in box],
+                'bbox': [int(x.item()) for x in xyxy],
                 'class': self.classes[int(cls)] if self.classes else int(cls),
                 'confidence': float(conf)
-            } for box, conf, cls in results
+            } for xyxy, conf, cls in results
         ]
 
-# The helper functions (letterbox, xywh2xyxy, scale_coords, clip_coords) remain the same
+# The helper functions (letterbox, non_max_suppression, xywh2xyxy, scale_coords, clip_coords) remain the same
 
 # Usage example
 if __name__ == "__main__":
