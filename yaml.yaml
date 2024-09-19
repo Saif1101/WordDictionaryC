@@ -1,45 +1,43 @@
-model:
-  name: patchcore
-  backbone: resnet50  # Use ResNet50 for capturing detailed features of the PDF pages
-  layers: [layer2, layer3]  # Focus on mid-level features for detailed anomaly detection
-  input_size: 640  # Resize images to 640x640 for high resolution
-
 dataset:
-  name: folder
-  format: folder
-  path: ./dataset  # Path to your dataset folder
-  normal_dir: normal  # Subfolder containing normal PDF images (including tick marks)
-  abnormal_dir: anomalous  # Subfolder containing anomalous images (handwritten notes, etc.)
-  image_size: 640  # Ensure all images are resized to 640x640
+  name: "document_anomaly"
+  format: "folder"
+  path: "/path/to/your/dataset"
+  normal_dir: "train/good"
+  abnormal_dir: "test/abnormal"
+  normal_test_dir: "test/good"
+  task: "segmentation"  # or "classification" if you don't need pixel-wise predictions
 
-trainer:
-  accelerator: gpu  # Use GPU for faster training; use 'cpu' if no GPU available
-  gpus: 1  # Use one GPU (can be adjusted based on available hardware)
-  max_epochs: 150  # Train for 150 epochs for better convergence
-  precision: 16  # Use mixed precision training to speed up training and reduce memory usage
+model:
+  name: "patchcore"
+  backbone: "wide_resnet50_2"
+  pre_trained: true
 
-optim:
-  lr: 0.001  # Learning rate for training
-  weight_decay: 1e-5  # Weight decay to prevent overfitting
+preprocessing:
+  resize:
+    height: 640
+    width: 640
+    p: 1.0
 
-callbacks:
-  - model_checkpoint:
-      monitor: val_loss  # Save the model with the lowest validation loss
-      save_top_k: 3  # Save the top 3 models
-  - early_stopping:
-      monitor: val_loss  # Stop training early if validation loss doesn't improve
-      patience: 10  # Wait for 10 epochs before stopping
+optimization:
+  num_epochs: 1
+  batch_size: 32
 
-logging:
-  log_images: True  # Log images of the anomaly map during training
-  logger: tensorboard  # Use TensorBoard to log metrics and images
+metrics:
+  image:
+    - F1Score
+    - AUROC
+  pixel:
+    - F1Score
+    - AUROC
 
-patchcore:
-  patch_size: 32  # Patch size small enough to detect fine-grained anomalies
-  stride: 16  # Ensure overlap between patches to catch small anomalies
-  num_neighbors: 9  # Number of nearest neighbors to compare patches
-  memory_bank_size: 0.50  # Use 50% of patches for memory bank (to capture more normal variations)
+visualization:
+  show_images: False
+  save_images: True
 
-post_processing:
-  threshold: 0.7  # Set the anomaly threshold to classify regions as anomalous (lower if necessary)
-  smoothing: True  # Apply smoothing to the anomaly map for cleaner detection
+project:
+  path: "./results"
+  log_images_to: []
+
+export:
+  format: "onnx"  # You can choose "onnx" or "openvino"
+  output: "./exported_model"
